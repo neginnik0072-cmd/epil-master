@@ -20,6 +20,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isMobile = () => innerWidth < 1024;
+const nav = $('[data-nav]');
 
 /* ---------------- smooth scroll ---------------- */
 let lenis = null;
@@ -30,7 +31,8 @@ if (!reduced) {
   gsap.ticker.lagSmoothing(0);
 }
 const goTo = (target) => {
-  const off = target === 0 ? 0 : -70;
+  const headerClearance = isMobile() ? nav.offsetHeight + 4 : 70;
+  const off = target === 0 ? 0 : -headerClearance;
   if (lenis) return lenis.scrollTo(target, { offset: off, duration: 1.4 });
   const y = (typeof target === 'number' ? target : target.getBoundingClientRect().top + scrollY) + off;
   window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
@@ -87,7 +89,7 @@ if (!reduced) {
 }
 
 /* ---------------- nav ---------------- */
-const nav = $('[data-nav]');
+const desktopHeader = matchMedia('(min-width: 1024px)');
 let lastY = 0;
 let navHidden = false;
 // Only GSAP moves the header (no CSS transform transition), so Safari can't leave it half-way.
@@ -96,9 +98,19 @@ const setNavHidden = (hide) => {
   navHidden = hide;
   gsap.to(nav, { yPercent: hide ? -105 : 0, duration: reduced ? 0 : 0.45, ease: 'power3.out', overwrite: true });
 };
+desktopHeader.addEventListener('change', ({ matches }) => {
+  lastY = Math.max(0, scrollY);
+  nav.classList.toggle('is-scrolled', matches && lastY > 40);
+  if (!matches) {
+    navHidden = false;
+    gsap.killTweensOf(nav, 'yPercent');
+    gsap.set(nav, { clearProps: 'transform' });
+  }
+});
 ScrollTrigger.create({
   start: 0, end: 'max',
   onUpdate: (s) => {
+    if (!desktopHeader.matches) return;
     const y = Math.max(0, s.scroll());
     nav.classList.toggle('is-scrolled', y > 40);
     if (y < 200) {
