@@ -399,7 +399,8 @@ body.menu-open { overflow: hidden; }
   overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: var(--pad);
 }
 .masters--pinned .masters__track { width: max-content; overflow: visible; scroll-snap-type: none; will-change: transform; }
-.masters__intro { width: min(520px, 80vw); flex: none; padding-right: clamp(10px, 4vw, 60px); display: flex; flex-direction: column; justify-content: center; }
+.masters__intro { width: min(520px, 80vw); flex: none; padding-right: clamp(10px, 4vw, 60px); display: flex; flex-direction: column; justify-content: center; scroll-snap-align: start; }
+.masters__intro .h2 { font-size: clamp(44px, 5.5vw, 86px); overflow-wrap: break-word; }
 .masters__intro p:not(.label) { margin-top: 24px; font-size: 17px; color: rgba(14,37,28,.75); max-width: 420px; }
 .masters__drag { display: flex; align-items: center; gap: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--moss) !important; }
 .masters__drag span { width: 60px; height: 1px; background: currentColor; position: relative; overflow: hidden; }
