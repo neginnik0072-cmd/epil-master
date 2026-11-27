@@ -43,18 +43,26 @@ const introState = { v: 0 };
 /* ---------------- preloader + intro ---------------- */
 function intro() {
   const pre = $('.preloader');
-  const vane = $('.pl-vane'), quill = $('.pl-quill');
-  [vane, quill].forEach((p) => { const l = p.getTotalLength(); p.style.strokeDasharray = l; p.style.strokeDashoffset = l; });
-
-  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
   if (reduced) {
     pre.remove();
     threads.setIntro(1);
     return;
   }
+
+  const vane = $('.pl-vane', pre);
+  const quill = $('.pl-quill', pre);
+  [vane, quill].forEach((path) => {
+    const length = path.getTotalLength();
+    path.style.strokeDasharray = length;
+    path.style.strokeDashoffset = length;
+    path.style.visibility = 'visible';
+  });
+
+  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
   tl.to(vane, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' })
     .to(quill, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.out' }, '-=0.35')
-    .to('.preloader__mark path', { fill: '#f3f1ea', duration: 0.3 }, '-=0.1')
+    .to('.preloader__logo', { opacity: 1, duration: 0.3 }, '-=0.1')
+    .to([vane, quill], { opacity: 0, duration: 0.3 }, '<')
     .to('.preloader__word', { opacity: 1, y: 0, duration: 0.4 }, '<')
     .to(pre, { yPercent: -100, duration: 0.9, ease: 'power4.inOut' }, '+=0.15')
     .add(() => pre.remove())
@@ -67,7 +75,7 @@ function intro() {
   // safety: never trap the user behind the preloader
   setTimeout(() => { if (document.body.contains(pre)) { pre.remove(); threads.setIntro(1); } }, 4500);
 }
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(intro); else intro();
+intro();
 
 /* hero scroll-out: converge the ribbon */
 ScrollTrigger.create({
@@ -107,14 +115,26 @@ ScrollTrigger.create({
 const burger = $('[data-burger]');
 const menu = $('[data-menu]');
 const setMenu = (open) => {
+  if (!open && menu.contains(document.activeElement)) burger.focus({ preventScroll: true });
   document.body.classList.toggle('menu-open', open);
   burger.setAttribute('aria-expanded', String(open));
+  burger.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
   menu.setAttribute('aria-hidden', String(!open));
-  if (open) setNavHidden(false);
+  menu.inert = !open;
+  if (open) {
+    setNavHidden(false);
+    menu.scrollTop = 0;
+    $('a', menu).focus({ preventScroll: true });
+  }
   if (lenis) open ? lenis.stop() : lenis.start();
-  if (open && !reduced) gsap.from('.menu__links a', { y: 40, opacity: 0, duration: 0.7, stagger: 0.05, ease: 'power3.out', delay: 0.15 });
 };
 burger.addEventListener('click', () => setMenu(!document.body.classList.contains('menu-open')));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !menu.inert) setMenu(false);
+});
+matchMedia('(max-width: 1180px)').addEventListener('change', ({ matches }) => {
+  if (!matches && !menu.inert) setMenu(false);
+});
 
 /* anchor links */
 $$('a[href^="#"]').forEach((a) => {
@@ -123,7 +143,15 @@ $$('a[href^="#"]').forEach((a) => {
     const t = id === '#top' ? 0 : $(id);
     if (t === null) return;
     e.preventDefault();
-    if (document.body.classList.contains('menu-open')) setMenu(false);
+    const fromMenu = !menu.inert;
+    if (fromMenu) setMenu(false);
+    if (id === '#messengers') {
+      t.focus({ preventScroll: true });
+    } else if (t && (fromMenu || a.closest('.hero__navigation'))) {
+      const heading = t.querySelector('h2, h3') ?? t;
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
     goTo(t);
   });
 });
@@ -142,58 +170,28 @@ if (!reduced) {
   $$('.rv, .rv-img').forEach((n) => { n.style.opacity = 1; n.style.transform = 'none'; n.style.clipPath = 'none'; });
 }
 
-/* ---------------- manifesto words ---------------- */
-(function words() {
-  const p = $('[data-words]');
-  const walk = (node) => {
-    [...node.childNodes].forEach((c) => {
-      if (c.nodeType === 3) {
-        const frag = document.createDocumentFragment();
-        c.textContent.split(/(\s+)/).forEach((part) => {
-          if (!part) return;
-          if (/^\s+$/.test(part)) frag.appendChild(document.createTextNode(part));
-          else { const s = document.createElement('span'); s.className = 'w'; s.textContent = part; frag.appendChild(s); }
-        });
-        c.replaceWith(frag);
-      } else if (c.nodeType === 1) walk(c);
-    });
-  };
-  walk(p);
-  const ws = $$('.w', p);
-  if (reduced) { ws.forEach((w) => (w.style.opacity = 1)); return; }
-  gsap.to(ws, { opacity: 1, stagger: 0.1, ease: 'none', scrollTrigger: { trigger: p, start: 'top 80%', end: 'bottom 45%', scrub: true } });
-})();
-
 /* ---------------- how it works ---------------- */
 initHow($('.how'), { reduced, mobile: isMobile() });
 
-/* ---------------- video ---------------- */
-$$('[data-video]').forEach((b) => b.addEventListener('click', () => {
-  const id = b.dataset.video;
-  const f = document.createElement('iframe');
-  f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0`;
-  f.allow = 'autoplay; encrypted-media; picture-in-picture';
-  f.allowFullscreen = true;
-  f.title = 'Процесс электроэпиляции';
-  b.querySelector('.phone__play')?.remove();
-  b.querySelector('.phone__cap')?.remove();
-  b.appendChild(f);
-  b.style.transform = 'none';
-}, { once: true }));
-
 /* ---------------- masters: horizontal pinned scroll ---------------- */
 const mm = gsap.matchMedia();
-mm.add('(min-width: 1024px) and (prefers-reduced-motion: no-preference)', () => {
+mm.add('(min-width: 1024px) and (min-height: 1000px) and (prefers-reduced-motion: no-preference)', () => {
+  const section = $('.masters');
   const track = $('.masters__track');
+  section.classList.add('masters--pinned');
+  if (section.offsetHeight > innerHeight) {
+    section.classList.remove('masters--pinned');
+    return;
+  }
   const dist = () => Math.max(0, track.scrollWidth - innerWidth);
   const tw = gsap.to(track, {
     x: () => -dist(), ease: 'none',
-    scrollTrigger: { trigger: '.masters', start: 'top top', end: () => '+=' + dist(), pin: true, scrub: 0.8, invalidateOnRefresh: true },
+    scrollTrigger: { trigger: section, start: 'top top', end: () => '+=' + dist(), pin: true, scrub: 0.8, invalidateOnRefresh: true },
   });
   $$('.master').forEach((card) => {
     gsap.from(card.querySelector('img'), { scale: 1.25, ease: 'none', scrollTrigger: { trigger: card, containerAnimation: tw, start: 'left right', end: 'center center', scrub: true } });
   });
-  return () => gsap.set(track, { clearProps: 'transform' });
+  return () => section.classList.remove('masters--pinned');
 });
 
 /* master sheet */
@@ -217,27 +215,9 @@ $$('dialog').forEach((d) => {
   $$('[data-close]', d).forEach((x) => x.addEventListener('click', () => closeDialog(d)));
 });
 
-/* ---------------- studio parallax ---------------- */
-if (!reduced) {
-  $$('.sg img').forEach((img) => {
-    const sp = parseFloat(img.dataset.speed || 0);
-    gsap.fromTo(img, { yPercent: -sp }, { yPercent: sp, ease: 'none', scrollTrigger: { trigger: img.parentElement, start: 'top bottom', end: 'bottom top', scrub: true } });
-  });
-}
-
 /* ---------------- results grid ---------------- */
-const grid = $('[data-rgrid]');
-const results = Array.from({ length: 15 }, (_, i) => ({ src: `${import.meta.env.BASE_URL}img/r-${String(i + 1).padStart(2, '0')}.webp`, cat: i < 8 ? 'face' : 'body' }));
-results.forEach((r, i) => {
-  const b = document.createElement('button');
-  b.className = 'rcard';
-  b.dataset.cat = r.cat;
-  b.dataset.n = String(i + 1).padStart(2, '0');
-  b.setAttribute('aria-label', `Открыть фото до и после №${i + 1}`);
-  b.innerHTML = `<img src="${r.src}" alt="Результат электроэпиляции: до и после" loading="lazy" width="900" height="900"/>`;
-  b.addEventListener('click', () => openLB(i));
-  grid.appendChild(b);
-});
+const resultCards = $$('.rcard', $('[data-rgrid]'));
+resultCards.forEach((card) => card.addEventListener('click', () => openLB(card)));
 if (!reduced) {
   ScrollTrigger.batch('.rcard', {
     start: 'top 92%',
@@ -247,7 +227,7 @@ if (!reduced) {
 }
 $$('.filters button').forEach((btn) => btn.addEventListener('click', () => {
   const f = btn.dataset.filter;
-  $$('.filters button').forEach((x) => { x.classList.toggle('is-on', x === btn); x.setAttribute('aria-selected', String(x === btn)); });
+  $$('.filters button').forEach((x) => { x.classList.toggle('is-on', x === btn); x.setAttribute('aria-pressed', String(x === btn)); });
   const cards = $$('.rcard');
   const state = Flip.getState(cards);
   cards.forEach((c) => c.classList.toggle('is-hidden', f !== 'all' && c.dataset.cat !== f));
@@ -268,10 +248,10 @@ function showLB() {
   $('.lightbox__count', lb).textContent = `${String(lbI + 1).padStart(2, '0')} / ${String(lbList.length).padStart(2, '0')}`;
   if (!reduced) gsap.fromTo(lbImg, { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.45, ease: 'power2.out' });
 }
-function openLB(i) {
-  const visible = $$('.rcard:not(.is-hidden)').map((c) => results[+c.dataset.n - 1]);
-  lbList = visible;
-  lbI = Math.max(0, visible.indexOf(results[i]));
+function openLB(card) {
+  const visible = resultCards.filter((item) => !item.classList.contains('is-hidden'));
+  lbList = visible.map((item) => $('img', item));
+  lbI = visible.indexOf(card);
   showLB();
   lb.showModal();
   lenis?.stop();
@@ -293,6 +273,7 @@ tabs.forEach((btn) => btn.addEventListener('click', () => {
     const on = b === btn;
     b.classList.toggle('is-on', on);
     b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
     const panel = document.getElementById(b.getAttribute('aria-controls'));
     panel.hidden = !on;
     if (on && !reduced) gsap.from(panel.children, { opacity: 0, y: 24, duration: 0.6, stagger: 0.06, ease: 'power3.out' });
@@ -302,15 +283,56 @@ tabs.forEach((btn) => btn.addEventListener('click', () => {
 }));
 const tabKeys = (e) => {
   const i = tabs.indexOf(document.activeElement);
-  if (i < 0) return;
-  if (e.key === 'ArrowRight') { tabs[(i + 1) % tabs.length].focus(); tabs[(i + 1) % tabs.length].click(); }
-  if (e.key === 'ArrowLeft') { tabs[(i - 1 + tabs.length) % tabs.length].focus(); tabs[(i - 1 + tabs.length) % tabs.length].click(); }
+  if (i < 0 || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+  e.preventDefault();
+  const step = e.key === 'ArrowRight' ? 1 : -1;
+  const next = tabs[(i + step + tabs.length) % tabs.length];
+  next.focus();
+  next.click();
 };
 $('.tabs').addEventListener('keydown', tabKeys);
 requestAnimationFrame(() => moveInk($('.tabs .is-on')));
 addEventListener('resize', () => moveInk($('.tabs .is-on')));
 
-initCalc($('[data-calc]'), { reduced });
+initCalc($('[data-calc]'), { reduced, onLayoutChange: () => ScrollTrigger.refresh() });
+
+/* Cataphoresis help */
+const cataHelpButton = $('.cata-help__button');
+const cataHelpText = $('#cata-help-text');
+let cataHelpPinned = false;
+let cataHelpTimer;
+const setCataHelp = (open) => {
+  clearTimeout(cataHelpTimer);
+  cataHelpText.hidden = !open;
+  cataHelpButton.setAttribute('aria-expanded', String(open));
+};
+const closeCataHelp = () => {
+  cataHelpPinned = false;
+  setCataHelp(false);
+};
+
+[cataHelpButton, cataHelpText].forEach((element) => {
+  element.addEventListener('pointerenter', (event) => {
+    if (event.pointerType === 'mouse') setCataHelp(true);
+  });
+  element.addEventListener('pointerleave', (event) => {
+    if (event.pointerType === 'mouse' && !cataHelpPinned) {
+      cataHelpTimer = setTimeout(closeCataHelp, 180);
+    }
+  });
+});
+cataHelpButton.addEventListener('click', () => {
+  cataHelpPinned = !cataHelpPinned;
+  setCataHelp(cataHelpPinned);
+});
+const dismissCataHelpOutside = ({ target }) => {
+  if (!cataHelpText.hidden && target !== cataHelpButton && !cataHelpText.contains(target)) closeCataHelp();
+};
+document.addEventListener('pointerdown', dismissCataHelpOutside);
+document.addEventListener('focusin', dismissCataHelpOutside);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !cataHelpText.hidden) closeCataHelp();
+});
 
 /* ---------------- FAQ ---------------- */
 $$('.qa__q').forEach((q) => q.addEventListener('click', () => {
